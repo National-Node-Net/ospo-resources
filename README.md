@@ -14,7 +14,7 @@ The contents maintained in this repository are designed for use with GitHub.
 
 ### Notes for external use
 
-If you wish to use these materials outside of the `National-Digital-Twin` organisation, please note that repository names used in the GitHub Actions files will require adjustment.
+If you wish to use these materials outside of the `National-Node-Net` organisation, please note that repository names used in the GitHub Actions files will require adjustment.
 
 ## Using the `synchronise-ospo-workflows` GitHub Action
 
