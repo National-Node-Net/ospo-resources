@@ -12,7 +12,7 @@ jobs:
   generate-sboms:
     runs-on: ubuntu-latest
     env:
-      ORG_NAME: <<Replace with GitHub Organisation Name, for example: National-Digital-Twin>>
+      ORG_NAME: <<Replace with GitHub Organisation Name, for example: National-Node-Net>>
       API_URL: https://api.github.com
 
     steps:
