@@ -45,10 +45,10 @@ To use these workflows, your repository must meet the following criteria:
   - `NDTP Repository Writer` (for git operations and merges)
   - `NDTP Pull Request Controller` (for PR management)
 - **Organisation Secrets:** The repository must have scoped access to the following Organisation Secrets, which are required for authentication and performing privileged operations:
-  - `NDTP_REPOSITORY_WRITER_APP_CLIENT_ID`
-  - `NDTP_REPOSITORY_WRITER_APP_PRIVATE_KEY`
-  - `NDTP_PULL_REQUEST_CONTROLLER_APP_CLIENT_ID`
-  - `NDTP_PULL_REQUEST_CONTROLLER_APP_PRIVATE_KEY`
+  - `NODE_NET_REPOSITORY_WRITER_APP_CLIENT_ID`
+  - `NODE_NET_REPOSITORY_WRITER_APP_PRIVATE_KEY`
+  - `NODE_NET_PULL_REQUEST_CONTROLLER_APP_CLIENT_ID`
+  - `NODE_NET_PULL_REQUEST_CONTROLLER_APP_PRIVATE_KEY`
 
 ## Installation
 
