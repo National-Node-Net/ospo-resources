@@ -30,7 +30,9 @@ tools/policy-as-code/
 │   ├── github/                        # Namespace: github
 │   │   ├── dependabot/                # Namespace: github.dependabot
 │   │   │   ├── dependabot.rego
-│   │   │   └── dependabot_test.rego
+│   │   │   ├── dependabot_test.rego
+│   │   │   ├── groups.rego
+│   │   │   └── groups_test.rego
 │   │   └── required_files/            # Namespace: github.required_files (Future example)
 │   │       ├── checks.rego
 │   │       └── checks_test.rego
@@ -38,6 +40,10 @@ tools/policy-as-code/
 ```
 
 *Note: In this repository, we colocate tests alongside the policy files.*
+
+## Dependabot groups
+
+Each update entry must have a nonempty `groups` object with object definitions and, unless `open-pull-requests-limit` is numeric zero, a version-update group. Omitted `applies-to` means `version-updates`; security-only groups do not qualify. Existing branch checks are unchanged. Major updates may be separated as a review preference, not a requirement.
 
 ## Developing Policies
 
