@@ -7,3 +7,4 @@
 .github/workflows/oss-checker.yml
 .github/workflows/auto-merge-dependabot-pull-requests.yml
 .github/workflows/stale-pr-alerts.yml
+.github/workflows/actions-sha-pin-check.yml
