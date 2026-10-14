@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright Crown Copyright 2026, National Digital Twin Programme (BIST).
+
+name: Check workflow action SHA pins
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      target-sha:
+        description: Target repository commit after OSPO synchronisation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  check-action-pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ github.repository }}
+          # Sync supplies its post-sync SHA; manual runs use the selected ref's SHA.
+          ref: ${{ inputs.target-sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinact v5.0.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          directory="$RUNNER_TEMP/pinact-bin"
+          mkdir -p "$directory"
+          archive="$directory/pinact_linux_amd64.tar.gz"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            https://github.com/suzuki-shunsuke/pinact/releases/download/v5.0.0/pinact_linux_amd64.tar.gz \
+            --output "$archive"
+          echo "d005bbb85da80dacdc07816f24a5da723a9f6d1e9f3d3e7e73df33f9caa1358f  $archive" | sha256sum --check
+          tar -xzf "$archive" -C "$directory" pinact
+          echo "$directory" >> "$GITHUB_PATH"
+
+      # Native pinact validation only: never edit workflows or create commits.
+      - name: Check all target workflow action references
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(.github/workflows/*.yml .github/workflows/*.yaml)
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::No workflow YAML files found."
+            exit 1
+          fi
+
+          # Do not allow target-repository configuration to exempt unpinned actions.
+          config="$RUNNER_TEMP/pinact-config.yaml"
+          printf 'version: 3\n' > "$config"
+          export PINACT_GLOBAL_CONFIG="$config"
+
+          set +e
+          pinact run --check --config "$config" "${files[@]}"
+          status=$?
+          set -e
+          printf '# Pinact workflow check\n\nWorkflows scanned: %s\n\nExit code: %s\n\nSee the step log for findings.\n' \
+            "${#files[@]}" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
