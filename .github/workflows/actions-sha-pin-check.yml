@@ -28,77 +28,43 @@ jobs:
           ref: ${{ inputs.target-sha || github.sha }}
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: '3.12'
-
-      - name: Install YAML parser
+      - name: Install pinact v5.0.0
+        shell: bash
         run: |
-          python -m pip install --only-binary=:all: 'PyYAML==6.0.3'
+          set -euo pipefail
+          directory="$RUNNER_TEMP/pinact-bin"
+          mkdir -p "$directory"
+          archive="$directory/pinact_linux_amd64.tar.gz"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            https://github.com/suzuki-shunsuke/pinact/releases/download/v5.0.0/pinact_linux_amd64.tar.gz \
+            --output "$archive"
+          echo "d005bbb85da80dacdc07816f24a5da723a9f6d1e9f3d3e7e73df33f9caa1358f  $archive" | sha256sum --check
+          tar -xzf "$archive" -C "$directory" pinact
+          echo "$directory" >> "$GITHUB_PATH"
 
-      # Parse only YAML; never execute scripts or local actions from the target repository.
+      # Native pinact validation only: never edit workflows or create commits.
       - name: Check all target workflow action references
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          python - <<'PY'
-          import os
-          import re
-          from pathlib import Path
+          set -euo pipefail
+          shopt -s nullglob
+          files=(.github/workflows/*.yml .github/workflows/*.yaml)
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::No workflow YAML files found."
+            exit 1
+          fi
 
-          import yaml
+          # Do not allow target-repository configuration to exempt unpinned actions.
+          config="$RUNNER_TEMP/pinact-config.yaml"
+          printf 'version: 3\n' > "$config"
+          export PINACT_GLOBAL_CONFIG="$config"
 
-          REMOTE_PIN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*@[0-9a-fA-F]{40}")
-          DOCKER_PIN = re.compile(r"docker://[^\s@]+@sha256:[0-9a-fA-F]{64}")
-
-          def is_pinned(reference):
-              return isinstance(reference, str) and (
-                  reference.startswith("./")
-                  or bool(REMOTE_PIN.fullmatch(reference) or DOCKER_PIN.fullmatch(reference))
-              )
-
-          def check_workflow(path):
-              if path.is_symlink():
-                  return ["workflow files must not be symbolic links"]
-              try:
-                  document = yaml.safe_load(path.read_text(encoding="utf-8"))
-              except (OSError, UnicodeError, yaml.YAMLError) as error:
-                  return [f"cannot parse workflow: {error}"]
-              if not isinstance(document, dict) or not isinstance(document.get("jobs"), dict):
-                  return ["workflow must contain a jobs mapping"]
-              errors = []
-              for job_name, job in document["jobs"].items():
-                  if not isinstance(job, dict):
-                      errors.append(f"job {job_name}: expected a mapping")
-                      continue
-                  steps = job.get("steps", [])
-                  if not isinstance(steps, list):
-                      errors.append(f"job {job_name}: steps must be a list")
-                      steps = []
-                  entries = [(f"job {job_name}: reusable workflow", job)]
-                  entries.extend((f"job {job_name}, step {index}: action", step) for index, step in enumerate(steps, 1))
-                  for location, entry in entries:
-                      if not isinstance(entry, dict):
-                          errors.append(f"{location}: expected a mapping")
-                      elif "uses" in entry and not is_pinned(entry["uses"]):
-                          errors.append(f"{location} is not SHA-pinned: {entry['uses']!r}")
-              return errors
-
-          def main():
-              paths = sorted(path for path in Path(".github/workflows").glob("*") if path.suffix in {".yml", ".yaml"})
-              failures = [f"{path}: {error}" for path in paths for error in check_workflow(path)]
-              if not paths:
-                  failures.append("No workflow YAML files found in .github/workflows.")
-              summary = ["# Workflow action SHA pin check", f"Workflows scanned: {len(paths)}", f"Failures: {len(failures)}"]
-              summary.extend(f"- {failure}" for failure in failures)
-              if not failures:
-                  summary.append("All remote actions and reusable workflows are pinned to full commit SHAs; Docker actions use SHA256 digests.")
-              report = "\n\n".join(summary) + "\n"
-              print(report)
-              if summary_path := os.environ.get("GITHUB_STEP_SUMMARY"):
-                  with open(summary_path, "a", encoding="utf-8") as stream:
-                      stream.write(report)
-              return int(bool(failures))
-
-          if __name__ == "__main__":
-              raise SystemExit(main())
-          PY
+          set +e
+          pinact run --check --config "$config" "${files[@]}"
+          status=$?
+          set -e
+          printf '# Pinact workflow check\n\nWorkflows scanned: %s\n\nExit code: %s\n\nSee the step log for findings.\n' \
+            "${#files[@]}" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
