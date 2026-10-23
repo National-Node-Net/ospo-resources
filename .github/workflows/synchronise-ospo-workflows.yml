@@ -18,6 +18,9 @@ jobs:
     permissions:
       contents: read
 
+    outputs:
+      synced-sha: ${{ steps.synced_commit.outputs.sha }}
+
     steps:
       - name: Fetch GitHub App token for target repo (write)
         id: target_token
@@ -125,4 +128,17 @@ jobs:
           else
             echo "No changes required. All OSPO workflow files are in sync."
           fi
+
+      - name: Record synchronised target commit
+        id: synced_commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  check-action-pins:
+    needs: synchronise-ospo-workflows
+    permissions:
+      contents: read
+    # The local reusable workflow comes from the same commit as this sync workflow.
+    uses: ./.github/workflows/actions-sha-pin-check.yml
+    with:
+      target-sha: ${{ needs.synchronise-ospo-workflows.outputs.synced-sha }}
 
